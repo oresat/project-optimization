@@ -1,0 +1,22 @@
+Task Name,Task #,Dependency,EE req,ME req,CS req
+Project Start,0,0,0,0,0
+Battery Card: Battery Research,1,0,1,0,0
+Battery Card: Battery Order and Testing,2,1,1,0,0
+Battery Card: Mechanical Assembly 1,3,2,0,2,0
+Battery Card: Mechanical Assembly 2,4,3,0,2,0
+Battery Card: Mechanical Assembly 3,5,4,0,1,0
+Battery Card: RBF/Inhibit Switch 1,6,4,1,1,0
+Battery Card: RBF/Inhibit Switch 2,7,6,1,1,0
+Battery Card: RBF/Inhibit Switch 3,8,7,0,1,0
+Battery Card: Lead Switch 1,9,4,1,1,0
+Battery Card: Lead Switch 2,10,9,1,1,0
+Battery Card: Lead Switch 3,11,10,0,1,0
+Battery Card: Fuel Gage 1,12,10,1,0,0
+Battery Card: Fuel Gage 2,13,12,1,0,0
+Battery Card: Fuel Gage 3,14,13,1,0,0
+Battery Card: Heater 1,15,10,1,0,0
+Battery Card: Heater 2,16,15,1,0,0
+Battery Card: Heater 3,17,16,1,0,0
+Battery Card: Over/Undercharge Protection 1,18,10,1,0,0
+Battery Card: Over/Undercharge Protection 2,19,18,1,0,0
+Battery Card: Over/Undercharge Protection 3,20,19,1,0,0
