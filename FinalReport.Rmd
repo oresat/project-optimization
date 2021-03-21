@@ -1,0 +1,754 @@
+---
+title: "OreSat2 Project Planning and Resource Optimization"
+author: 'Adam Lundstrom, Alekhya Penmatsa, Dharshanika Selvakumar, Purabi Panigraphy, Risto Rushford'
+date:  "ETM-540 (Winter-2021) 3/20/2021"
+output:
+  pdf_document: default
+  tufte::tufte_handout:
+    citation_package: natbib
+    latex_engine: xelatex
+  tufte::tufte_book:
+    citation_package: natbib
+    latex_engine: xelatex
+  tufte::tufte_html: default
+subtitle: 
+runningheader: OreSat2 Schedule Optimization
+link-citations: yes
+urlcolor: blue
+---
+
+```{r setup, include=FALSE}
+library (magrittr, quietly = TRUE) #Used for pipes/dplyr
+library (dplyr, quietly = TRUE)
+library (ROI, quietly = TRUE)
+library (ROI.plugin.glpk, quietly = TRUE)
+library (ompr, quietly = TRUE)
+library (ompr.roi, quietly = TRUE)
+library (pander, quietly = TRUE)
+library (tufte, quietly = TRUE)
+library (tint)
+library (gridExtra)
+library (formatR)
+library (knitr)
+library (kableExtra)
+library (readr)
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(tidy = FALSE)
+knitr::opts_chunk$set(cache = FALSE)
+knitr::opts_chunk$set(width = 30)
+options(knitr.table.format = "latex")
+knitr::opts_chunk$set(cache.extra = packageVersion('tufte'))
+```
+
+# Introduction
+
+The Portland State Aerospace Society(PSAS) is a student aerospace engineering project at Portland State University. It builds low-cost, open source rockets and satellites that feature the most advanced amateur rocket avionics systems. It has two satellite projects in it’s Oregon Satellite (OreSat) program called OreSat0 (Oregon’s first satellite), to be handed off for launch in April 2021; and OreSat1, which will go to space in the following year. These projects were a first in PSAS history and came with many pain points as the group made mistakes and learned hard lessons in effective resource allocation. Along with these challenges has come the realization that some tasks may have been scheduled more efficiently to support completing important elements of the project with fewer delays. 
+\vspace{12pt}
+
+The next project is OreSat2, which will tentatively begin in Fall 2021 (arbitrary) and will build on the lessons learned from the previous two missions to extend PSAS space engineering capabilities. The goal is to begin planning for this project to find the best allocation of human resources (skills) to meet the objective of completing as soon as possible, with a four year upper bound. The human resources include PSU students who volunteer, intern or work on capstone projects, and are broken up according to skill areas in the denomination of available hours. 
+\vspace{12pt}
+
+
+This is why for the next project, OreSat2, we are performing a scheduling optimization exercise using Operations Research methodologies in Integer Programming. This paper will explore the model development and implementation based on the Critical Subsystems portion of the OreSat2 work breakdown structure (WBS), which can then be expanded to include further elements of the WBS once successfully demonstrated.
+\vspace{12pt}
+
+# Problem Statememt
+
+The problem is about the optimal scheduling and project planning for OreSat2. The scheduling and planning decisions need to be made over a Four-Year time horizon, with the aim of optimizing the use of our resources and also minimizing slack. The scope of the problem comprises capstone students and volunteers with mostly non paid internships.
+\vspace{12pt}
+
+$$\pagebreak$$
+
+# Background And Methodologies
+
+Our project is focused on finding an optimized schedule for the OreSat2 project, the third in the family of Oregon Satellite cubesats developed by the Portland State Aerospace Society (PSAS), an aerospace engineering-focused student group at Portland State University. To begin our project, we first interviewed the OreSat project management team and then conducted a literature review on similar projects.
+
+## Literature Review
+
+We are trying to solve a type of “Resource Constrained Project Scheduling Problem”, which is well covered in Operations Research literature as a variation of the “Job Shop” problem. Our initial work attempted to solve this problem independently (see the section on Mathematical Formulations) before we discovered the correct key words to use in our literature search. 
+
+Some key documents that helped us to develop our approach and mathematical formulations for this problem are [1] Resource Constrained Project Scheduling: A Branch and Cut Approach, and [2] Multiproject Scheduling with Limited Resources: A Zero-One Programming Approach.
+
+When we discovered [1], we realized that it was solving a very similar problem to ours and that we could formulate our problem much more simply than we were attempting. Using this, we re-formulated our approach and reduced the number of variables used. We also found information that we could use in [2] that enables us to add new elements to our model for future work. This paper outlines several variations of Project Scheduling problems with corresponding formulations that can be used depending on the scenario, types of resources, scheduling flexibility (or lack thereof), and other factors.
+
+The interested reader can find a great many research papers on this topic using keywords like “resource constrained project scheduling problem”, or its acronym “RCPSP”, or “job shop problem”. Unfortunately, we have yet to find any literature that provides sufficient detail about their implementation or that otherwise makes their work reproducible. This has given us the interest of making sure to document our approach and our implementation so that future researchers can reproduce and further build on our work.
+
+
+
+## Interviews with OreSat Project Managers
+
+As this project seeks to find the optimal schedule for a future OreSat project, we met with the Portland State Aerospace Society’s project managers to discuss the details of the project and its needs. Some key considerations that arose are the particular nature of planning for a complex, extra-curricular student project that relies heavily on student volunteers across a range of disciplines. This unique environment required us to plan the skill availability for our model on a limited basis, with the most skills available for the fall quarter in each project, then each resource pool decreases in each subsequent quarter but then is effectively replenished in the following spring. This matches the normal cadence of student membership and turnover for PSAS and other project-based student groups.
+
+The problem presented is to find an optimized schedule for completion of the OreSat2 project, taking the lessons learned of scarce and variable resources from the previous OreSat projects. This schedule is given a maximum time horizon of four years. The tasks to be completed in our model are taken from the Work Breakdown Structure (WBS) provided by the OreSat project management. This WBS is made up of the first through third levels of project tasks that need to be completed for each component of the satellite project and its supporting activities based on the previous OreSat projects (OreSat0 and OreSat1). Once the WBS was in hand, Risto, who is on this team and also one of the OreSat project managers, took the Critical Subsystem section of the WBS and broke it down further into aggregated tasks of duration one quarter to be used in a simplified model which could later be scaled to cover the full OreSat2 project.
+
+Each task in the WBS subset was then assigned its expected necessary amount of resources in terms of skill pools (themselves allocated based on available disciplines of student volunteers). The tasks within the Critical Subsystems WBS are assumed to require skills from one of three pools: Electrical Engineering, Mechanical Engineering, and Computer Science. The larger OreSat2 project will utilize skillsets from a broader range of disciplines, and there is also opportunity to improve the model by specifying which area of expertise/interest within the discipline is best applied to certain tasks (see the Future Work section below). Another opportunity for improvement is to assign preferences for how students apply their skills to which projects, as one common pain point in previous OreSat projects has been that students are not interested in working on items that are most important for project completion. This will also be addressed in future work.
+
+
+
+
+# Problem Assumptions
+
+Our Project and Model formulation proposed is based on the following assumptions:
+
+* The OreSat projects are scheduled uniformly discretized on a quarterly basis to complete the tasks within the allocated time period of 16 quarters. 
+
+* All the tasks and resources required to be done were predefined. The resources are the  current students of PSU from Mechanical Engineering, Electrical Engineering and Computer Science Departments. 
+
+* All the tasks have a fixed point in time for beginning it and to end the task. Similarly, the Task dependencies are known with fixed allocations.
+
+* All the materials and tools that are required for the operation of a project are always provided in time to the students to perform all their tasks in time.
+
+* A task always depends on the immediate tasks such as a task starts when its first operation begins and finishes when the last operation ends.
+
+* We are focusing on modeling a subset of the Work Breakdown Structure to create a minimum viable model.
+
+* All skill resources that are required to perform the projects are drained and replenished on an annual basis.
+
+
+
+# Problem Characteristics:
+
+* The goal is project completion.
+
+* An optimal solution is a completed project. 
+
+* The only alternative (infeasible solution) is an incomplete project. 
+
+* Since personnel resource availability and task resource requirements are known and fixed, there is no need to attempt to minimize personnel resource usage; rather, personnel resource usage constraints should focus on adequate coverage of all task resource requirements.
+
+$$\pagebreak$$
+
+# OreSat2 Project Data
+
+This section describe the data used for our model.
+
+## Work Breakdown Structure
+
+We are given two key datasets with which to perform this analysis. First, we have the Critical Subsystem element of the OreSat2 WBS. Let's upload and investigate this data:
+
+```{r oresat2_wbs, echo = FALSE}
+getwd()
+
+oresat2_wbs <- read.csv('WBSM.csv')
+
+wbs <- oresat2_wbs
+
+wbs
+```
+
+```{r wbs_head, echo = FALSE}
+knitr::kable(wbs[1:6,], align = "lccccc", booktabs = T,
+            caption = 'OreSat2 WBS First 6 Tasks for Critical Subsystems',
+            linesep = "") %>%
+ kable_styling(latex_options = c("striped", "hold_position"))
+```
+
+## Resource Requirement and Classification
+
+* RESOURCE REQUIREMENT :
+The project has a finite number of personnel resources that can be assigned to tasks each quarter. For example, task A might require two ME resources and 1 EE resource beginning in quarter 4, and 1 CS resource every quarter for the following 5 quarters.
+
+* HUMAN RESOURCE CLASSIFICATION: 
+OreSat2 is an interdisciplinary project which makes  use of human resources from the following three engineering backgrounds :
+
+ - Mechanical Engineering (ME)
+ - Electrical Engineering (EE)
+ - Computer Science (CS).
+
+
+## Dependencies
+
+In a Gantt chart precedence is used to identify the order in which the tasks are carried out. The precedence is linked to multiple tasks and also with milestones. This is used to create a network diagram, perform PERT analysis and find out the critical path to optimize the operations.
+For the scope of our project we considered binary dependencies between the eighty nine tasks considered in the critical subsystems. Each task is only related to one other task. The dependency truth table is calculated between the 89 tasks. Manually creating the truth table can be tedious, lead to error, and time consuming. There are 7921 cells to be filled with zeroes and ones in the dependency table. Writing a code chunk was the efficient way to get the output truth table. A CSV file with the tasks and binary dependency is the input to get the dependency table.
+
+
+## Parameter input data
+
+The model draws parameter data from three matrices stored in csv files.
+
+WBSM.csv stores resource requirement parameter values for each task ($Q_{rj}$). The matrix data dimensions are $J$ rows (one per task) by $R$ columns (one per resource type). The model R code reads the task index upper bound from this dataset.
+
+CapM.csv stores resource capacity parameter values ($K_{rt}$) for each resource type ($r$) in each time interval ($t$). The matrix dataset dimensions are $R$ rows by $T$ columns. the initial column stores a zero-value vector for "Task 0", used to initialize the task completion algorithm. The model R code reads the resource types and time intervals upper bounds from the dataset row and column lengths, respectively.
+
+DependencyM.csv stores task precedent/antecedent dependency relationship parameter values for each possible dependency relationship ($D_{jy}$) for each precedent task ($y$) and antecedent task ($j$). The matrix dataset dimensions are $j$ rows by $y$ columns. Row 1 contains a zero-value vector for "Task 0", which has no dependencies and is used to kickstart the task completion algorithm. Row $J$ values are all set to 1. This is the "Finish Line" task, which is dependent upon completion of all other tasks. Column $Y$ also contains a zero-value vector for the "Finish Line" task, since no other task is dependent upon the final task. 
+
+
+
+# Model Creation
+
+## Opportunities for model expansion and exploration 
+
+The model does not cover every aspect of the project it represents.
+Once model validation is complete, the model can be modified to simulate additional aspects of the project. These modifications may provide additional insight into the optimization of design resource allocation. Possible modifications include but are not limited to the following:
+
+### Task start times
+
+Tasks can be given earliest start time constraints. For example, task 25 may not begin until the facilities necessary for its implementation are opened in quarter 14.
+
+### Multiple task dependencies
+
+An antecedent task can be assigned several precedent tasks to accurately reflect a complex work breakdown structure. 
+
+### Personnel resource granularization and availability (bandwidth) 
+
+In the version of the model evaluated in this report, personnel resource work capacity is treated as a total integer capacity (K).  In future versions, K could be configured to be a sum of individual resource entity availability (binary) or bandwitdth (integer) status to reflect personnel resource bandwidth for zero or more tasks per time unit.
+
+### Task prioritization
+
+In order to execute and gain a "complete" status value, project tasks are expected to "compete" for personnel resource units available in a given time unit. In many cases within the R model mechanics, these task variables may appear identical to the solver in terms of completion status qualification. But the tasks they represent may possess characteristics that once identified would give them higher priority status for assignment of resources than other otherwise identical tasks. Such characteristics could be assigned variables, which can then be prioritized within the model by one or more new constraints.
+
+For instance, a precedent task attached to the greatest number of dependency relationships to antecedent tasks might be assigned the highest priority over other otherwise identical tasks for assignment of personnel resources. A corresponding "biggest family" constraint would compare the sums of precedent task dependency relationship decision variables $(D_{jy})$ and assign personnel resources first to task $y$ with completion status $Z_{jt} = 0$ that have the highest  antecedent task dependency sum $\sum_{j=1}^JD_{jy}$.
+
+Currently, the model treats 
+
+## Optimization Model Formulation
+
+The optimization model underwent one major revision and several refinements of the current working revision. The original model formulation was built around an objective function that nominally minimized total resource costs, with resource unit costs all set to 1. This was to allow the constraints to ensure resource assignment coverage of all tasks. The model was formulated without the indexing of resource variables. In addition, one of the constraints included an operation that might introduce nonlinearity to the model. Validation of this model failed, and its development was abandoned in favor of a different approach. The final formulation of the original model can be found in the appendix.
+
+The current working model is formulated around an objective function that maximizes the sum across tasks and time units of positive task/term completion states. The model utilizes indexed resources. 
+
+## Parameters
+
+Parameters are explained in the LaTeX model below.
+
+## Decision variables
+
+$Z_{jt}$ and $Z_{yt}$ are decision variables representing completion state of each antecedent task and precedent task respectively in each time unit. If task j is complete in time unit t, then $Z_{jt}$ is equal to 1, otherwise.
+
+$X_{rjt}$ is the resource-to-task in time assignment decision variable. If resource n of resource unit r is assigned to task j in time unit t, then $X_{rjt}$ is equal to n.
+
+## Constraints
+
+Initial line numbers correspond to constraint number levels in the LaTeX model below. 
+
+(1) prevents $Z_{jt}$ decision variables from being set to 1 by the objective function until total assignment quantity of resource r to task j $\left(\sum_{t = 1}^{T} X_{rjt}\right)$ has been driven up to equal the required resource quantity ($Q_{rj}$).
+
+(2) limits the total assignment quantity of resource r to task j $\left(\sum_{t = 1}^{T} X_{rjt}\right)$ to the total capacity of resource $r$ in time $t$ (K_{rt}).
+
+(3) limits the total assignment quantity of resource r to task j $\left(\sum_{t = 1}^{T} X_{rjt}\right)$ to the total requirement of resource $r$ for task $j$.
+
+(4) restricts task completion status decision variable $Z_{jt}$ to being set to 1 unless all task completion status decision variables ($Z_{yt}$) with a precedent dependency relationship ($D_{jy})$ are also first set to 1. The table below compares all possible constraint instance outcomes and there effect on possible values of $Z_{jt}$.
+
+(5 - 7) variable index domain constraints
+
+
+$$
+\begin{aligned}
+1 - D_{jy} + (D_{jy}*Z_{yt}) = & \ && Z_{jt} =\\
+1 - 0 + (0 * 0) = & \ 1 && \{0,1\} \ \text{(no y/j precedence relationship)}\\
+1 - 1 + (1 * 0) = & \ 0 && \ \ \ \ 0 \ \ \ \ \ \text{(y/j precedence relationship AND precedent task is incomplete)}\\
+1 - 0 + (0 * 1) = & \ 1 && \{0,1\} \ \text{(no y/j precedence relationship)}\\
+1 - 1 + (1 * 1) = & \ 1 && \{0,1\} \ \text{(y/j precedence relationship AND precedent task is complete, }\\
+& && Z_{jt} \text{ value determined by constraint (1)}\\
+\end{aligned}
+$$
+
+$$
+\begin{aligned}
+max \ & \sum_{j=1}^{J} \sum_{t=1}^{T}  Z_{jt} && \text{objective function} \\
+\\
+s.t: (1) & \ Z_{jt} Q_{rj} \le \sum_{t = 1}^{T} X_{rjt} \ \forall \ r,j,t && \text{Task j completion status vs resource assignment} \\
+\\
+(2) & \ \sum_{j = 1}^{J} X_{rjt} \le K_{rt} \ \forall \ r,t && \text{assignments vs capacity} \\
+\\
+(3) & \ \sum_{t = 1}^{T} X_{rjt} \le Q_{rj} \ \forall \ r,j && \text{assignments vs requirements} \\
+\\
+(4) & \ Z_{jt} \le 1 - D_{jy} + (D_{jy}Z_{yt}) \ \forall \ j,y,t && \text{task dependencies} \\
+\\
+(5) & \ j,y \ \in \{J\} && \text{task index variables}\\
+\\
+(6) & \ r \ \in \{\mathbb{N}\} && \text{resource index variable} \\
+\\
+(7) & \ t \ \in \{T\} && \text{time index variable}\\
+\\
+\end{aligned}
+$$
+
+$$
+\begin{aligned}
+\text{where:} \ & Q_{rj} \ \text{is the requiremet of resource r for task j. Integer parameter data, stored in file Qrj.csv} \\
+\\
+& K_{rt} \ \text{is the capacity of resource r at time t. Binary parameter data, stored in file Krt.csv} \\
+\\
+& D_{jy} \ \text{is the dependency of task j on task y. Binary parameter data, stored in file Djy.csv} \\
+\\
+& Z_{jt}, Z_{yt} \ \text{are antecedent and precedent task completion status in unit time decision variables}\\
+\\
+& X_{rjt} \ \text{ is the the resource-to-task in time assignment decision variable.}\\
+\end{aligned}
+$$
+
+
+
+## Reading and Allocating data
+
+`DependencyM.csv` file  contains the data in binary ( 0 or 1) for the task dependencies.
+
+`CapM.csv` files contains the data regarding the capacity of each skill resources for each quarter.
+
+
+Reading data from the files and assigning them to variables `D`, `Q` and `K`:
+
+```{r allocate_wbs_data}
+D <- read.csv("DependencyM.csv", header=FALSE) #D[j,j]
+# print Dimensions of D
+dim(D)
+knitr::kable(D, align = "c", booktabs = T,
+            caption = 'Task Dependency matrix (rows are tasks, columns are dependencies)',
+            linesep = "") %>%
+kable_styling(latex_options = c("striped", "hold_position", "scale_down"))
+
+Q <- wbs[,4:6]     # Q[j,r]
+# print Dimensions of Q
+dim(Q)
+knitr::kable(Q, align = "c", booktabs = T,
+            caption = 'Task/Skill requirements matrix of medium-sized data set',
+            linesep = "") %>%
+kable_styling(latex_options = c("striped", "hold_position"))
+
+K <- read.csv("CapM.csv", header=FALSE) # K[t,r]
+# print Dimensions of k
+dim(K)
+knitr::kable(K, align = "c", booktabs = T,
+            caption = 'Skill Availability matrix',
+            linesep = "") %>%
+kable_styling(latex_options = c("striped", "hold_position"))
+```
+
+Let's assign the column and row values from the above variables to variables `Ntasks`,`Nskills` and `Nqtrs`
+
+```{r assign_variable}
+Ntasks <- nrow(wbs)
+
+#Print the Ntasks
+Ntasks
+
+Nskills <- nrow(K)
+
+#Print the Nskills
+Nskills
+
+Nqtrs <- ncol(K)
+
+#Print the Nqtrs
+Nqtrs
+```
+
+
+## Model Implementation
+
+
+With all the data stored into our variables let's move into the model implementation. Model,`OreSat2` has been created as below:
+
+
+```{r OreSat2}
+
+OreSat2 <- MIPModel() %>%
+
+    # If Task j is completed at time ,t
+  add_variable(Zj[j,t], j = 1:Ntasks, t = 1:Nqtrs, type = "binary") %>%
+    
+  # If task jcannot be completed unless task y is completed
+  add_variable(Zy[j,t], j = 1:Ntasks, t = 1:Nqtrs, type = "binary") %>%
+
+  # Assignment of resources to task 'j 'at time 't' 
+  add_variable(X[r,j,t], r = 1:Nskills, j = 1:Ntasks, t = 1:Nqtrs, type = "integer") %>%
+    
+ 
+  # Maximization of Tasks completed
+  set_objective( sum_expr( Zj[j,t], j = 1:Ntasks, t = 1:Nqtrs), "max")%>%
+
+  
+  # Task completion requirement
+  
+  add_constraint(Q[j,r]*Zj[j,t]
+              <= sum_expr(X[r,j,t], t=1:Nqtrs) , r=1:Nskills, j=1:Ntasks, t=1:Nqtrs)  %>%
+  
+  #Assignments Vs Requirements
+  add_constraint( sum_expr(X[r,j,t],t=1:Nqtrs)
+                 <= Q[j,r],r=1:Nskills, j=1:Ntasks) %>%
+  
+  
+  # Assignment Vs Capacity
+  add_constraint( sum_expr(X[r,j,t], j=1:Ntasks)
+                 <= K[r,t],r=1:Nskills, t=1:Nqtrs ) %>%
+  
+ 
+  # Task Dependency
+  add_constraint( Zj[j,t]
+                 <= 1-D[j,y] + D[j,y]*Zy[y,t], j=1:Ntasks, y=1:Ntasks, t=1:Nqtrs) 
+
+
+
+OreSat2
+```
+
+Let's solve the model:
+
+```{r solve_model}
+
+result <- solve_model(OreSat2, with_ROI(solver = "glpk"))
+
+#Print result
+result
+
+```
+```{r_solution}
+
+OreSat2Sol <-(result$solution)
+
+#OreSat2Sol
+
+```
+
+Let's parse the results to filter out values greater than zero:
+
+```{r Task_parsing_results}
+matching <- result %>% 
+  get_solution(Zj[j,t]) %>%
+  filter(value > .9) %>%  
+  select(j, t)
+
+knitr::kable(matching[1:10,], align = "c", booktabs = T,
+            caption = 'Task j done in Quarter t, first 10 rows',
+            linesep = "") %>%
+kable_styling(latex_options = c("striped", "hold_position"))
+```
+
+$$\pagebreak$$
+
+# Results and Discussion
+
+In this section We will discuss the results  and the observations we had when executing our model. 
+
+## Initial model:
+
+Our Initial Latex Equation that we formulated was highly complex.We assumed that integer programming can model any of the variables and constraints that we really wanted to add.We had difficulties in implementing the model. We were thrown lot of errors. With Professor's advise, we simplified our objective function and lessened our constraints.
+
+## Revised Model:
+
+We had difficulty with our model being running out of memory as the branch & cut tree becomes so large that insufficient memory was not able to solve LP. A run of the model was attempted however the workstation ended the operation upon exhaustion of relocatable memory after 4 hours of building the model (before the solver even began to work)
+
+To resolve the above issue professor suggested these following options:
+
+ - Experimenting our model with Smaller Set of Data
+ 
+ - Implementing our model with Gurobi as Gurobi solvers usually provide both higher performance and better numerical robustness than it’s competing solvers.
+ 
+ - Implementing our model with Symphony solver for mixed-integer linear programs for better solution.
+ 
+ With the time constraint, We tried starting with the first option of  verifying our model with small set of data first and considered experimenting the other options with Gurobi and Symphony for future ( As a thesis work for 2 of our Team Mates)
+
+### With Smaller Set of Data:
+ 
+We started experimenting our model with smaller set o data first.
+
+Model was run with small subset of the original data:
+
+* The total number of Tasks was reduced from 89 to first 20 tasks
+
+* The Number of Quarters were reduced from 16 to  8
+
+* The Skill resource pools(This remained same)
+
+
+**Observations:**
+
+* The solution was optimal.
+
+* All the tasks were completed in the first quarter.
+
+* We noticed our constraints were not sufficient to prevent Zjt from flipping to 1 event though the dependency task Zjy has not been completed.
+The above issue remained even after reducing each resource for each quarter to half.
+
+$$\pagebreak$$
+
+# Lessons And Skills learned
+
+Over the course of this project we have learned the importance of having a clear mathematical formulation of the problem that we are trying to solve, and that we should make it as simple as possible (every new layer of complexity makes it more difficult to complement, and may also increase the computing costs of implementation).
+
+We also learned how to build a scalable model through careful implementation in our code. We made sure that before loading data into the model that we had prepared code to read in the files, measure the rows and columns and use that information to scale the model automatically. This has enabled us to use different sized datasets for testing and also allows us to add new tasks and skillsets to the existing model so long as they are uploaded in properly formatted .csv files.
+
+Another important lesson was that having poorly defined constraints on a large dataset can lead to high computational costs. In one early attempt to run our model using the full Critical Subsystems WBS it took four hours for OMPR to build the model, only to run out of allocated memory and fail to solve. This is what originally pushed us to use smaller datasets as mentioned above.
+
+Related to this is the lesson that having poorly defined constraints can affect the viability of our model. We have so far failed to find the correct constraint to complete tasks in an order that makes sense based on the task dependency constraints and limited skill availability per quarter. This has led to extended campaigns of debugging our coded implementation and reformulating our mathematical model. While researching this problem, we have found some example formulations that will be tried in future work, some of which promise not only to help us to solve the model, but to reduce the computational complexity by eliminating some subsets of variables since they will no longer need to be calculated under certain conditions.
+
+
+# Limitations
+
+The design and implementation of a scheduling Optimization should be robust and essential for the successful use of planning and scheduling practices in OreSat2 project. But our model has certain limitations  and they are listed below:
+
+* Our model is subject to undergo many other iterations of change. The best is yet to come.
+
+* The model’s output needs to be polished with an effective outcome and need more analysis.
+
+* Our model is developed for PSAS student volunteers. Less applicable for industrial use. Often the industrial environments are highly dynamic with a high level of uncertainty and modifications. Therefore, efficient rescheduling methods should also be provided, utilizing fast execution models.
+
+* This research did not tool project cost and resource fluctuation into consideration. A optimization in scheduling requires a holistic vision of the organization which mostly include maximization of profit along with the maximization of throughput and the minimization of slack.
+
+* We explored the model development and implementation based on the Critical Subsystems portion of the OreSat2 work breakdown structure (WBS). Full implementation of the model not yet validated.
+
+* We are exploring the model development and implementation based on the Critical Subsystems portion of the OreSat2 work breakdown structure (WBS). Full implementation of the model is not yet validated.
+
+* Our model execution ran out of memory with our complete set of data. We were able to verify Model executed with only a smaller data set. 
+
+$$\pagebreak$$
+
+# Conclusion
+
+The Scheduling of Oresat2 project involves the allocation of given resources to the project to determine the start and completion times of the tasks. However, there are multiple parallel tasks which need out simultaneously which might involve sharing and competing for limited resources which increasing the complexity of the scheduling process. The allocation of these limited resources within multiple tasks across all the quarters becomes a major challenge. Therefore, an efficient multi tasks scheduling is a key problem for our project to schedule and prioritize tasks with limited resources among multiple tasks to meet the resource requirements of different projects, and to optimize all the projects’ multiple objectives. This paper develops a scheduling optimization model for multiple tasks considering resource constraint. The model is focused to help our project owners optimize project schedule. The best model is yet to come. We have experimented with revised models and data.  A complete desired model is not yet fully implemented. We studied it's limitations and they will help us in our future work. 
+
+# Future Work
+
+We have identified several areas for future work and potential future work on this project in the areas of better accounting of human resources (skill allocation, student preferences and skill levels) as well as using multi-project scheduling methods and multi-objective programming that factors in cost.
+
+## Better Modeling of Human Resources
+
+As  mentioned in earlier parts of this report, there are many opportunities to improve and expand the model. The Portland State Aerospace Society is an interdisciplinary group with a large variety of skill sets including sub-disciplines in computer and electrical engineering, mechanical engineering, computer science, systems engineering and project management, business accounting, marketing, supply chain management, physics, applied mathematics, chemistry, and others. As our model is refined, we can add new tasks that require new skillets that were not originally considered.
+
+Another important way to improve the model is to take into account student preferences. One pain point of past OreSat projects has been that students are either unwilling or unable to take on certain tasks on the critical path for project completion. This leads naturally to the problems of task preferences by students who are picky and of students with insufficient skill levels to take on more difficult tasks. To model these would require adding additional constraints to our mathematical formulation and may also add to the computational complexity of the model.
+
+Since we are scheduling a project that is dependent on the work of students, we have also considered that we could add constraints to model fatigue, where students who contribute beyond a certain number of activities become less productive. This may be done by adding a graduating penalty for the overallocation of resources stemming from any one individual.
+
+PSAS is able to maintain continuity of long time-duration projects like OreSat2 despite the high student turnover thanks to the contributions from alumni and other industry advisors. Their contributions are critical to the continued success of PSAS projects but are not accounted for in the current model. It may be possible to include these individuals in the model using the skill level variable/constraint mentioned above.
+
+
+## Project-Level Modifications
+
+Another opportunity for improvement is to break the project into subprojects with their own families of tasks and their own pools of resources. This can be done using some of the methods discussed in the paper “Multiproject Scheduling with Limited Resources: A Zero-One Programming Approach”. This would only require a moderate amount of additional coding in our implementation because we were careful to set our model up to accommodate different sizes of datasets so long as they have the proper corresponding dimensions and correlation of data elements.
+
+Finally, we can build in additional objective functions to our model. Cost minimization is an important aspect of project scheduling problems in general and would be an important element to include in this one. The reason why we didn’t is that the costs associated with OreSat projects in general are harder to quantify since PSAS relies heavily on material donations that don’t always come with a statement of monetary value. However project costs are still an important factor in PSAS projects and so accounting for this will be necessary to create a useful model for future project planning purposes.
+
+$$\pagebreak$$
+
+# Appendix
+
+## A
+
+**Questions asked to Subject Matter Experts**
+
+Q. What went well with OreSat0 and 1?
+
+Answers : 
+* It cost less
+* Industry expert's advises were taken
+
+Q. What were the pain points of the OreSat0 and OreSat1?
+
+Answers:
+
+ * Should have started fundraising earlier
+ 
+ * Software (needed more effort/time/resources)
+ 
+ * Constrained by hardware
+ 
+ * Licensing should have been started sooner
+ 
+ * Turnover of students
+ 
+ * Students Chose too small of a vehicle size
+ 
+ * Science mission was under-specified
+ 
+ * lack of Consistent project management ( a dedicated person)
+ 
+Q Did the scope of those projects change frequently?
+ 
+ Answer:
+ 
+* No, but our understanding of the scope/requirements changed
+
+Q Are the requirements for OreSat2 finalized?
+
+Answer:
+Mostly set by regulatory agencies, launch providers
+
+Q Does the OreSat2 project require new skills (resources) compared to previous versions?
+
+Answer: 
+
+The New Skills required are :
+
+* In-space propulsion
+
+* Communications beyond low-earth orbit
+
+* Power
+
+* Radiation
+
+The new Resources required are: 
+
+* Testing
+
+* Donated components
+
+* Guidance, Navigation & Control
+
+Q. Did they face resource constraints in the previous projects? If so how was this managed?
+
+Answers:
+
+* Student turnover puts constant constraint on available human resources
+
+* Limited finances
+
+Q. What were the tools used for resource management? Pros and Cons?
+
+Answers:
+
+* Microsoft Project for scheduling
+
+* Slack for messaging
+
+* GitHub
+
+Q. How is the project team selection process carried out? Are there any contracts or assurance from them that they will be committed to the project?
+
+Answers:
+
+* We advertise at start of each quarter and students come to meetings
+
+* We try to outline what we need and recruit students into those, but students are too picky
+
+* Interns and capstone members sign a contract, everyone else is a volunteer
+
+* People vet themselves
+
+Q. Objective of OreSat2 : Minimum time required for completion and launch (Start to Finish)
+
+Answers:
+
+* Objective: test/qualify OreSat tech in deep space
+
+* MAYBE start sometime in 2022 (spring, summer?)
+
+* Duration 4 years
+
+Q. What are the Constraints?
+
+Answers:
+
+* Budget Constraint : maximum amount of  fund
+
+* Resources Constraint: Number of maximum available resources
+
+ - Electrical Engineers
+ - Mechanical Engineers
+ - Computer Scientists
+ - Project Managers
+ - Marketers (fundraisers)
+ - Supply chain managers?
+
+$$\pagebreak$$
+
+## B
+
+### Model LaTeX Revisions
+
+
+
+**Original model**
+Here is the LATEX Equation of Initial model
+
+![Original model formulation](LaTeX.jpg)
+
+
+
+
+
+**Revision 1**
+
+$$
+\begin{aligned}
+max \ & \sum\limits_{j=1}^{J} \sum\limits_{t=1}^{T}  Z_{jt} && \text{objective function} \\
+\\
+s.t: \ & \sum\limits_{t=1}^{T} X_{rjt} \le Q_{rj}\cdot Z_{jt} \ \forall \ r,j,t && \text{(1) assignments vs requirements} \\
+\\
+& \sum\limits_{t=1}^{T} X_{rjt} \le K_{rt} \ \forall \ r,j && \text{(2) assignments vs capacity} \\
+\\
+& Z_{jt}\leq Z_{yt}\cdot D_{jy} \ \forall \ t, (j,y) && \text{(3) task dependencies} \\
+\\
+\text{where:} \ & Q_{rj} \ \text{is the requiremet of resource r for task j} && \text{(4) Integer parameter data, stored in file Qrj.csv} \\
+\\
+& K_{rt} \ \text{is the capacity of resource r at time t} && \text{(5) Binary parameter data, stored in file Krt.csv} \\
+\\
+& Z_{jy} \ \text{is the dependency of task j on task y} && \text{(6) Binary parameter data, stored in file Djy.csv} \\
+\\
+& j,y \ \in \{J\} && \text{(7) task index variables}\\
+\\
+& r \ \in \{\mathbb{N}\} && \text{(8) resource index variable} \\
+\\
+& t \ \in \{T\} && \text{(9) time index variable}\\
+\end{aligned}
+$$
+
+**Revised Version 2** ( Working Model)
+
+
+$$
+\begin{aligned}
+max \ & \sum\limits_{j=1}^{J} \sum\limits_{t=1}^{T}  Z_{jt} && \text{objective function} \\
+\\
+s.t: \ & Z_{jt} Q_{rj} \le \sum_{t = 1}^{T} X_{rjt} \ \forall \ r,j,t && \text{(1) Task j completion status vs resource assignment} \\
+\\
+& \sum_{j = 1}^{J} X_{rjt} \le K_{rt} \ \forall \ r,t && \text{(2) assignments vs capacity} \\
+\\
+& \sum_{t = 1}^{T} X_{rjt} \le Q_{rj} \ \forall \ r,j && \text{(3) assignments vs requirements} \\
+\\
+& Z_{jt} \le 1 - D_{jy} + (D_{jy}Z_{yt}) \ \forall \ j,y,t && \text{(4) task dependencies} \\
+\\
+\text{where:} \ & Q_{rj} \ \text{is the requiremet of resource r for task j} && \text{(5) Integer parameter data, stored in file Qrj.csv} \\
+\\
+& K_{rt} \ \text{is the capacity of resource r at time t} && \text{(6) Binary parameter data, stored in file Krt.csv} \\
+\\
+& D_{jy} \ \text{is the dependency of task j on task y} && \text{(7) Binary parameter data, stored in file Djy.csv} \\
+\\
+& j,y \ \in \{J\} && \text{(8) task index variables}\\
+\\
+& r \ \in \{\mathbb{N}\} && \text{(9) resource index variable} \\
+\\
+& t \ \in \{T\} && \text{(10) time index variable}\\
+\end{aligned}
+$$
+
+$$\pagebreak$$
+
+
+## C
+
+We will have our code available in gitHub repository for Oresat project.
+
+Our gitHub Repository link:
+
+https://github.com/oresat/project-optimization
+
+
+$$\pagebreak$$
+
+
+
+# References
+
+K. Waledzik, J. Mańdziuk Applying hybrid monte carlo tree search methods to risk–aware project scheduling problem Inf. Sci. J. (2017)
+
+S. Gay, et al. Conflict ordering search for scheduling problems Proceedings of the International Conference on Principles and Practice of Constraint Programming, Springer, Cham (2015)
+
+M. Tavana, A.-R. Abtahi, K. Khalili-Damghani A new multi–objective multi–mode model for solving preemptive time–cost–quality trade–off project scheduling problems Expert Syst. App., 41 (4) (2014), pp. 1830-1846
+
+R. Leus, W. Herroelen Stability and resource allocation in project planning IIE Transactions, 36 (2004), pp. 667-682
+
+
+Fu L, Liu Q, Calamai P. Real-Time Optimization Model for Dynamic Scheduling of Transit Operations. Transportation Research Record. 2003;1857(1):48-55. doi:10.3141/1857-06
+
+Erschler, J., Lopez, P.: Energy-based approach for task scheduling under time and resources constraints. In: Proceedings of the 2nd International Workshop on Project Management and Scheduling, pp. 115–121 (1990)
+
+Heinz, S., Beck, J.C.: Solving resource allocation/scheduling problems with constraint integer programming. In: Proceedings of the Workshop on Constraint Satisfaction Techniques for Planning and Scheduling Problems (COPLAS 2011), pp. 23–30 (2011)
+
+Jeffrey D. Kelly, Danielle Zyngier. An Improved MILP Modeling of Sequence-Dependent  Switch-Overs for Discrete-Time Scheduling Problems
+
+Chakrabortty, R.K., Abbasi, A., Ryan, M.J., 2020. Multi‐mode resource‐constrained project scheduling using modified variable neighborhood search heuristic. International Transactions in Operational Research 27, 1, 138–167.
+
+A. Alan B. Pritsker, Watters, L., & Wolfe, P. (1969). Multiproject Scheduling with Limited Resources: A Zero-One Programming Approach. Management Science, 16(1), 93-108. Retrieved March 21, 2021, from http://www.jstor.org/stable/2628369
+
